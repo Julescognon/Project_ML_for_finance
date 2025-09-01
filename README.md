@@ -45,7 +45,6 @@ TailGAN/
 | **Table 5** (Generalisation error)  | `GOM.py` |
 | **Table 6 & 9** (Rand vs Eig)       | `EigenPort.py`, `TailGAN.py`, `Evaluation.py` |
 | **Table 8** (Realistic Data)        | `TailGAN.py`, `Evaluation.py` |
-| **Figures 4,11,16,17** (Tail quantiles) | `Plot_Quantile_PnL.py` |
 | **Figures 7,9,10,14** (Training curves) | `Plot_Training.py` |
 | **Figure 8** (Explained variance)   | `EigenPort.py` |
 
