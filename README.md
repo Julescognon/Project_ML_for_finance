@@ -26,11 +26,11 @@ TailGAN/
 ├── WGAN.py               # Wasserstein-GAN baseline                       –
 ├── GOM.py                # supervised “Generative-Only Model” (§5.3)      Fig 7      Tbl 4,5
 ├── Evaluation.py         # relative-error RE(N), generalisation dq, ds    Tbl 1,3,6,8
-├── Rejection_rate.py     # Coverage & Score tests (§4.2)                  Tbl 2
+├── Rejection_rate.py     # Coverage & Score tests (§4.2)                  –
 ├── EigenPort.py          # eigen-portfolio construction (§5.4)            Fig 8,14   Tbl 6,9
 ├── Plot_Training.py      # training-error curves                          Fig 7,9,10,14
-├── Plot_Quantile_PnL.py  # rank-frequency & VaR charts                    Fig 4,11,16,17
-├── Plot_Corr_Auto.py     # correlation / autocorr diagnostics             Fig 5,6,12,13 
+├── Plot_Quantile_PnL.py  # rank-frequency & VaR charts                    –
+├── Plot_Corr_Auto.py     # correlation / autocorr diagnostics             –
 └── README.md
 ```
 
@@ -46,7 +46,6 @@ TailGAN/
 | **Table 6 & 9** (Rand vs Eig)       | `EigenPort.py`, `TailGAN.py`, `Evaluation.py` |
 | **Table 8** (Realistic Data)        | `TailGAN.py`, `Evaluation.py` |
 | **Figures 4,11,16,17** (Tail quantiles) | `Plot_Quantile_PnL.py` |
-| **Figures 5,6,12,13** (Corr/ACF)    | `Plot_Corr_Auto.py` |
 | **Figures 7,9,10,14** (Training curves) | `Plot_Training.py` |
 | **Figure 8** (Explained variance)   | `EigenPort.py` |
 
