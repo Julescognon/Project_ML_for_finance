@@ -83,11 +83,11 @@ To run the reproducibility check, the following computing environment and packag
 If you use this code, please cite the paper:
 
 ```bibtex
-@article{cont2022tail,
-  title   = {Tail-GAN: Learning to Simulate Tail-Risk Scenarios},
-  author  = {Cont, Rama and Cucuringu, Mihai and Xu, Renyuan and Zhang, Chao},
-  journal={arXiv preprint arXiv:2203.01664},
-  year={2022}
-  note= {Working paper, version May 2025}
+@article{cont2025tail,
+  title={Tail-gan: Learning to simulate tail risk scenarios},
+  author={Cont, Rama and Cucuringu, Mihai and Xu, Renyuan and Zhang, Chao},
+  journal={Management Science},
+  year={2025},
+  publisher={INFORMS}
 }
 ```
