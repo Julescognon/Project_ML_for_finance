@@ -24,6 +24,8 @@ from Transform import *
 from gen_thresholds import gen_thresholds
 from util import *
 
+from NewStrategies import Momentum, Breakout, VolTarget
+
 # set random seed 
 seed = 1
 np.random.seed(seed)
@@ -31,28 +33,36 @@ torch.manual_seed(seed)
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", type=int, default=3000, help="epochs for training")
-parser.add_argument("--batch_size", type=int, default=1000, help="size of the batches")
-parser.add_argument("--lr_D", type=float, default=1e-7, help="learning rate for Discriminator")
-parser.add_argument("--lr_G", type=float, default=1e-6, help="learning rate for Generator")
+parser.add_argument("--n_epochs", type=int, default=10, help="epochs for training")
+parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
+parser.add_argument("--lr_D", type=float, default=1e-5, help="learning rate for Discriminator")
+parser.add_argument("--lr_G", type=float, default=1e-4, help="learning rate for Generator")
 parser.add_argument('--temp', type=float, default=0.01, help='multiplier of temperature')
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of second order momentum of gradient")
 parser.add_argument("--latent_dim", type=int, default=1000, help="dimensionality of the latent space")
-parser.add_argument("--len", type=int, default=50000, help="number of examples")
-parser.add_argument("--n_rows", type=int, default=5, help="number of rows")
+# parser.add_argument("--len", type=int, default=100, help="number of examples")
+# parser.add_argument("--n_rows", type=int, default=5, help="number of rows")
+parser.add_argument("--len", type=int, default=52, help="number of examples")
+parser.add_argument("--n_rows", type=int, default=10, help="number of rows")
 parser.add_argument("--n_cols", type=int, default=100, help="number of columns")
 parser.add_argument("--n_critic_G", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--n_critic_D", type=int, default=1, help="number of training steps for generator per iter")
 parser.add_argument("--static_way", type=str, default='LShort', help="trading way of static portfolios")
-parser.add_argument("--strategies", type=list, default=['Port', 'MR', 'TF'], help="a list of strategy names")
+# parser.add_argument("--strategies", type=list, default=['Port', 'MR', 'TF'], help="a list of strategy names")
+# parser.add_argument("--strategies", type=list, default=['Port', 'MR', 'TF', 'MOM', 'BO', 'VT'], help="a list of strategy names")
+parser.add_argument("--strategies", type=list, default=['Port'], help="a list of strategy names")
+# parser.add_argument("--strategies", type=list, default=[], help="a list of strategy names")
 parser.add_argument("--n_trans", type=int, default=50, help="number of static portfolios")
 parser.add_argument("--Cap", type=int, default=10, help="maximum investment capital")
 parser.add_argument("--WH", type=int, default=10, help="window history for strategy")
 parser.add_argument("--ratios", type=list, default=[1.0, 1.0], help="ratios for longing or shorting")
 parser.add_argument("--thresholds_pct", type=list, default=[[31, 69]], help="thresholds for longing or shorting")
 parser.add_argument("--data_name", type=str, default='1_Gauss+1_AR50+1_AR-12+1_GARCH-T5+1_GARCH-T10', help="data name")
-parser.add_argument("--tickers", type=list, default=['Gauss', 'AR50', 'AR-12', 'GARCH-T5', 'GARCH-T10'], help="tickers")
+#parser.add_argument("--data_name", type=str, default='Crypto10_TEST', help="data name")
+#parser.add_argument("--tickers", type=list, default=['Gauss', 'AR50', 'AR-12', 'GARCH-T5', 'GARCH-T10'], help="tickers")
+# parser.add_argument("--tickers", type=list, default=['BTC', 'ETH', 'BNB', 'XRP', 'ADA', 'DOGE', 'SOL', 'LTC', 'TRX', 'LINK'], help="tickers")
+parser.add_argument("--tickers", type=list, default=['BTC', 'ETH', 'BNB', 'XRP', 'SOL'], help="tickers")
 parser.add_argument("--noise_name", type=str, default='t5', help="noise name")
 parser.add_argument("--alphas", type=list, default=[0.05], help="quantiles")
 parser.add_argument("--W", type=float, default=10.0, help="scale parameter for W")
@@ -60,6 +70,8 @@ parser.add_argument("--score", type=str, default='quant', help="score function")
 parser.add_argument("--numNN", type=int, default=10, help="number of NNs")
 parser.add_argument("--project", type=bool, default=True, help="Project into constraint set")
 parser.add_argument("--version", type=str, default=f'Test{seed}', help="version number")
+parser.add_argument("--lambda_corr", type=float, default=0.0, help="weight of correlation loss")
+
 
 opt = parser.parse_args()
 print(opt)
@@ -67,18 +79,39 @@ R_shape = (opt.n_rows, opt.n_cols)
 
 
 def Infer_Shape(R_shape):
+    # """
+    # Shape of portfolio returns
+    # :param R_shape: shape of asset returns
+    # """
+    # PNL_shape_0 = R_shape[0]
+    # for strategy in opt.strategies:
+    #     if strategy == 'Port':
+    #         PNL_shape_0 += opt.n_trans
+    #     elif strategy == 'MR':
+    #         PNL_shape_0 += opt.n_rows * len(opt.thresholds_pct)
+    #     elif strategy == 'TF':
+    #         PNL_shape_0 += opt.n_rows * len(opt.thresholds_pct)
+    #     else:
+    #         pass
+    # PNL_shape = (PNL_shape_0, R_shape[1])
+    # return PNL_shape
     """
-    Shape of portfolio returns
-    :param R_shape: shape of asset returns
+    Infer the total number of PnL streams (K) from the strategy configuration.
+    This extends the original Infer_Shape to account for MOM, BO, and VT.
+
+    Each new strategy produces n_rows PnL streams (one per asset), exactly like MR/TF.
     """
-    PNL_shape_0 = R_shape[0]
+    PNL_shape_0 = R_shape[0]  # BuyHold: one PnL per asset
     for strategy in opt.strategies:
         if strategy == 'Port':
             PNL_shape_0 += opt.n_trans
-        elif strategy == 'MR':
-            PNL_shape_0 += opt.n_rows * len(opt.thresholds_pct)
-        elif strategy == 'TF':
-            PNL_shape_0 += opt.n_rows * len(opt.thresholds_pct)
+        elif strategy in ('MR', 'TF', 'MOM', 'BO', 'VT'):
+            # Each of these strategies produces one PnL per asset
+            # For MR/TF: multiplied by the number of threshold configurations
+            if strategy in ('MR', 'TF'):
+                PNL_shape_0 += R_shape[0] * len(opt.thresholds_pct)
+            else:
+                PNL_shape_0 += R_shape[0]
         else:
             pass
     PNL_shape = (PNL_shape_0, R_shape[1])
@@ -109,13 +142,13 @@ this_version = '_'.join(
      'Esb' + str(opt.numNN)])
 
 # set path
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 
 # Save Path
-gen_data_path = join(your_path, "Gens/gen_data_{this_version}")
+gen_data_path = join(your_path, f"Gens/gen_data_{this_version}")
 os.makedirs(gen_data_path, exist_ok=True)
 
-model_path = join(your_path, "Models/model_{this_version}")
+model_path = join(your_path, f"Models/model_{this_version}")
 os.makedirs(model_path, exist_ok=True)
 
 
@@ -128,10 +161,42 @@ def Compute_PNL(R):
     """
     R is the return matrix
     """
-    # convert to Prices
+    # # convert to Prices
+    # prices_l = Inc2Price(R)
+    # port_prices_l = StaticPort(prices_l, opt.n_trans, opt.static_way, insample=True)
+
+    # PNL_BH = BuyHold(prices_l, opt.Cap)
+    # PNL_l = [PNL_BH]
+
+    # for strategy in opt.strategies:
+    #     if strategy == 'Port':
+    #         PNL_BHPort = BuyHold(port_prices_l, opt.Cap)
+    #         PNL_l.append(PNL_BHPort)
+    #     elif strategy == 'MR':
+    #         for percentile_l in opt.thresholds_pct:
+    #             #thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, 100, opt.WH)
+    #             thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, opt.len, opt.WH)
+    #             PNL_MR = MeanRev(prices_l, opt.Cap, opt.WH, LR=opt.ratios[0], SR=opt.ratios[1],
+    #                              ST=thresholds_array[:, -1], LT=thresholds_array[:, -2])
+    #             PNL_l.append(PNL_MR)
+    #     elif strategy == 'TF':
+    #         for percentile_l in opt.thresholds_pct:
+    #             #thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, 100, opt.WH)
+    #             thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, opt.len, opt.WH)
+    #             PNL_TF = TrendFollow(prices_l, opt.Cap, opt.WH, LR=opt.ratios[0], SR=opt.ratios[1],
+    #                                  ST=thresholds_array[:, 0], LT=thresholds_array[:, 1])
+    #             PNL_l.append(PNL_TF)
+    #     else:
+    #         pass
+
+    # PNL = torch.cat(PNL_l, dim=1)
+    # return PNL
+
+    # Convert returns to prices
     prices_l = Inc2Price(R)
     port_prices_l = StaticPort(prices_l, opt.n_trans, opt.static_way, insample=True)
 
+    # Always start with buy-and-hold on individual assets
     PNL_BH = BuyHold(prices_l, opt.Cap)
     PNL_l = [PNL_BH]
 
@@ -139,18 +204,58 @@ def Compute_PNL(R):
         if strategy == 'Port':
             PNL_BHPort = BuyHold(port_prices_l, opt.Cap)
             PNL_l.append(PNL_BHPort)
+
         elif strategy == 'MR':
             for percentile_l in opt.thresholds_pct:
-                thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, 100, opt.WH)
-                PNL_MR = MeanRev(prices_l, opt.Cap, opt.WH, LR=opt.ratios[0], SR=opt.ratios[1],
-                                 ST=thresholds_array[:, -1], LT=thresholds_array[:, -2])
+                thresholds_array = gen_thresholds(
+                    opt.data_name, opt.tickers, strategy,
+                    percentile_l, opt.len, opt.WH
+                )
+                PNL_MR = MeanRev(
+                    prices_l, opt.Cap, opt.WH,
+                    LR=opt.ratios[0], SR=opt.ratios[1],
+                    ST=thresholds_array[:, -1], LT=thresholds_array[:, -2]
+                )
                 PNL_l.append(PNL_MR)
+
         elif strategy == 'TF':
             for percentile_l in opt.thresholds_pct:
-                thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, 100, opt.WH)
-                PNL_TF = TrendFollow(prices_l, opt.Cap, opt.WH, LR=opt.ratios[0], SR=opt.ratios[1],
-                                     ST=thresholds_array[:, 0], LT=thresholds_array[:, 1])
+                thresholds_array = gen_thresholds(
+                    opt.data_name, opt.tickers, strategy,
+                    percentile_l, opt.len, opt.WH
+                )
+                PNL_TF = TrendFollow(
+                    prices_l, opt.Cap, opt.WH,
+                    LR=opt.ratios[0], SR=opt.ratios[1],
+                    ST=thresholds_array[:, 0], LT=thresholds_array[:, 1]
+                )
                 PNL_l.append(PNL_TF)
+
+        # ===== NEW STRATEGIES =====
+
+        elif strategy == 'MOM':
+            PNL_MOM = Momentum(
+                prices_l, opt.Cap, opt.WH,
+                LR=opt.ratios[0], SR=opt.ratios[1],
+                upper_pct=opt.thresholds_pct[0][1],
+                lower_pct=opt.thresholds_pct[0][0],
+            )
+            PNL_l.append(PNL_MOM)
+
+        elif strategy == 'BO':
+            PNL_BO = Breakout(
+                prices_l, opt.Cap, opt.WH,
+                LR=opt.ratios[0], SR=opt.ratios[1],
+            )
+            PNL_l.append(PNL_BO)
+
+        elif strategy == 'VT':
+            PNL_VT = VolTarget(
+                prices_l, opt.Cap, opt.WH,
+                target_vol=0.10,
+            )
+            PNL_l.append(PNL_VT)
+
         else:
             pass
 
@@ -237,6 +342,8 @@ def G1(v):
 def G2(e, scale=1):
     return scale * torch.exp(e / scale)
 
+# def G2(e, scale=1):
+#     return scale * torch.log(1 + torch.exp(e / scale))
 
 def G2in(e, scale=1):
     return scale ** 2 * torch.exp(e / scale)
@@ -245,6 +352,11 @@ def G2in(e, scale=1):
 def G1_quant(v, W=opt.W):
     return - W * v ** 2 / 2
 
+# def G1_quant(v, W=opt.W):
+#     return - W * torch.abs(v)
+
+# def G1_quant(v, W=opt.W):
+#     return - W * (0.5  * v**2 + 0.5 * torch.abs(v))
 
 def G2_quant(e, alpha):
     return alpha * e
@@ -302,6 +414,18 @@ class Score(nn.Module):
 
         return loss
 
+def corr_mat_torch(R):
+    x = R.permute(0, 2, 1).reshape(-1, R.shape[1])
+    x = x - x.mean(dim=0, keepdim=True)
+    std = x.std(dim=0, unbiased=False, keepdim=True) + 1e-8
+    x = x / std
+    corr = torch.matmul(x.T, x) / x.shape[0]
+    return corr
+
+def corr_loss(fake_R, real_R):
+    corr_fake = corr_mat_torch(fake_R)
+    corr_real = corr_mat_torch(real_R)
+    return torch.mean((corr_fake - corr_real) ** 2)
 
 # ----------
 #  Training
@@ -359,7 +483,8 @@ def Train_Single(opt, dataloader, model_index, seed):
                 PNL, PNL_validity = discriminator(real_R)
                 gen_PNL, gen_PNL_validity = discriminator(gen_R)
                 real_score = criterion(PNL_validity, PNL)
-                fake_score = criterion(gen_PNL_validity, PNL)
+                # fake_score = criterion(gen_PNL_validity, PNL)
+                fake_score = criterion(gen_PNL_validity, gen_PNL)
                 loss_D = real_score - fake_score
 
                 # Update the Gradient in Discriminator
@@ -379,7 +504,13 @@ def Train_Single(opt, dataloader, model_index, seed):
 
                 # Adversarial loss
                 gen_PNL, gen_PNL_validity = discriminator(gen_R)
-                loss_G = criterion(gen_PNL_validity, PNL)
+                # loss_G = criterion(gen_PNL_validity, PNL)
+                # loss_G = criterion(gen_PNL_validity, gen_PNL)
+                # gen_PNL, gen_PNL_validity = discriminator(gen_R)
+                adv_loss = criterion(gen_PNL_validity, gen_PNL)
+                # adv_loss = criterion(gen_PNL_validity, PNL)
+                c_loss = corr_loss(gen_R, real_R)
+                loss_G = adv_loss + opt.lambda_corr * c_loss
 
                 # Update the Gradient in Discriminator
                 loss_G.backward()
@@ -427,36 +558,38 @@ def Train(opt):
     """
     # Configure data loader
     dataset = Dataset_IS(tickers=opt.tickers, data_path=join(your_path, "gan_data", opt.data_name), length=opt.len)
-    dataloader = torch.utils.data.DataLoader(dataset,
-                                             batch_size=opt.batch_size,
-                                             shuffle=True)
+    # dataloader = torch.utils.data.DataLoader(dataset,
+    #                                          batch_size=opt.batch_size,
+    #                                          shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
 
     for iii in range(opt.numNN):
-        print("------ Model %d Starts with Random Seed %d " % (iii, seed))
-        Train_Single(opt, dataloader, model_index=iii, seed=seed)
+        current_seed = seed + iii
+        print("------ Model %d Starts with Random Seed %d " % (iii, current_seed))
+        Train_Single(opt, dataloader, model_index=iii, seed=current_seed)
 
 
 # Some trained models may not converge well, we only use those models with a good converge
 # This selection is based on the training data, so no look-forward bias
 def Screen_Ensemble(thres_perc=50):
-    loss_l = []
-    for j in range(opt.numNN):
-        # load loss, focus on the last generator loss
-        loss_np = np.load(join(gen_data_path, 'loss_id%d.npy' % j))
-        loss_l.append(loss_np[:, 1].iloc[-1])
+    # loss_l = []
+    # for j in range(opt.numNN):
+    #     # load loss, focus on the last generator loss
+    #     loss_np = np.load(join(gen_data_path, 'loss_id%d.npy' % j))
+    #     loss_l.append(loss_np[:, 1][-1])
 
-    threshold_loss = np.percentile(loss_l, thres_perc)
-    select_l = []
-    for j in range(opt.numNN):
-        if loss_l[j] <= threshold_loss:
-            select_l.append(j)
-        else:
-            pass
-    return select_l
-
+    # threshold_loss = np.percentile(loss_l, thres_perc)
+    # select_l = []
+    # for j in range(opt.numNN):
+    #     if loss_l[j] <= threshold_loss:
+    #         select_l.append(j)
+    #     else:
+    #         pass
+    # return select_l
+    return list(range(opt.numNN))
 
 if __name__ == "__main__":
     Train(opt)
     select_l = Screen_Ensemble()
     # select_l = Screen_Ensemble(thres_perc=50)
-    # print("Selected Models: ", select_l)
+    print("Selected Models: ", select_l)

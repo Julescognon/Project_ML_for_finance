@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+Gens/
+Models/
+Plots/
+Results_OOS_S1000/
+Results_S1000/
+Static_Port_Transform/
+Thresholds/
+gan_data/

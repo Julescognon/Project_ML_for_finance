@@ -43,7 +43,8 @@ parser.add_argument("--WH", type=int, default=10, help="window history for strat
 parser.add_argument("--ratios", type=list, default=[1.0, 1.0], help="ratios for longing or shorting")
 parser.add_argument("--thresholds_pct", type=list, default=[[31, 69]], help="thresholds for longing or shorting")
 parser.add_argument("--data_name", type=str, default='A10_F9s_10Years', help="data name")
-parser.add_argument("--tickers", type=list, default=['AAPL', 'AMZN', 'GOOG', 'JPM', 'QQQ'], help="tickers")
+# parser.add_argument("--tickers", type=list, default=['AAPL', 'AMZN', 'GOOG', 'JPM', 'QQQ'], help="tickers")
+parser.add_argument("--tickers", type=list, default=['BTC', 'ETH', 'BNB', 'XRP', 'ADA', 'DOGE', 'SOL', 'LTC', 'TRX', 'LINK'], help="tickers")
 parser.add_argument("--noise_name", type=str, default='t5', help="noise name")
 parser.add_argument("--alphas", type=list, default=[0.05], help="quantiles")
 parser.add_argument("--scale1", type=float, default=1.0, help="scale parameter for G1")
@@ -96,7 +97,7 @@ this_version = '_'.join(
 
 
 # set path
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 
 # Save Path
 gen_data_path = join(your_path, "Gens/gen_data_{this_version}")
@@ -344,11 +345,11 @@ def Train(opt):
                 # Update the Gradient in Discriminator
                 loss_G.backward()
                 optimizer_G.step()
-
-                print(
-                    "[Epoch %d] [Batch %d/%d] [G loss: %.4f]"
-                    % (epoch, batches_done, len(dataloader), loss_G.item())
-                )
+                if batches_done % 100 == 0 and epoch % 100 == 0:
+                    print(
+                        "[Epoch %d] [Batch %d/%d] [G loss: %.4f]"
+                        % (epoch, batches_done, len(dataloader), loss_G.item())
+                    )
 
             batches_done += 1
 

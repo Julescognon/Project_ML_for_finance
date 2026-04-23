@@ -27,8 +27,8 @@ torch.manual_seed(seed)
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=3000, help="epochs for training")
 parser.add_argument("--batch_size", type=int, default=1000, help="size of the batches")
-parser.add_argument("--lr_D", type=float, default=1e-6, help="learning rate for Discriminator")
-parser.add_argument("--lr_G", type=float, default=1e-6, help="learning rate for Generator")
+parser.add_argument("--lr_D", type=float, default=1e-4, help="learning rate for Discriminator")
+parser.add_argument("--lr_G", type=float, default=1e-4, help="learning rate for Generator")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of second order momentum of gradient")
 parser.add_argument("--latent_dim", type=int, default=1000, help="dimensionality of the latent space")
@@ -36,11 +36,12 @@ parser.add_argument("--len", type=int, default=50000, help="number of examples")
 parser.add_argument("--n_rows", type=int, default=5, help="number of rows")
 parser.add_argument("--n_cols", type=int, default=100, help="number of columns")
 parser.add_argument("--n_critic_G", type=int, default=1, help="number of training steps for discriminator per iter")
-parser.add_argument("--n_critic_D", type=int, default=1, help="number of training steps for generator per iter")
+parser.add_argument("--n_critic_D", type=int, default=5, help="number of training steps for generator per iter")
 parser.add_argument("--data_name", type=str, default='1_Gauss+1_AR50+1_AR-12+1_GARCH-T5+1_GARCH-T10', help="data name")
-parser.add_argument("--tickers", type=list, default=['Gauss', 'AR50', 'AR-12', 'GARCH-T5', 'GARCH-T10'], help="tickers")
+# parser.add_argument("--tickers", type=list, default=['Gauss', 'AR50', 'AR-12', 'GARCH-T5', 'GARCH-T10'], help="tickers")
+parser.add_argument("--tickers", type=list, default=['BTC', 'ETH', 'BNB', 'XRP', 'ADA', 'DOGE', 'SOL', 'LTC', 'TRX', 'LINK'], help="tickers")
 parser.add_argument("--noise_name", type=str, default='normal', help="noise name")
-parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
+parser.add_argument("--clip_value", type=float, default=0.001, help="lower and upper clip value for disc. weights")
 parser.add_argument("--numNN", type=int, default=1, help="number of NNs")
 parser.add_argument("--version", type=str, default='Test_WGAN', help="version number")
 
@@ -62,7 +63,7 @@ this_version = '_'.join(
 
 
 # Save Path
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 
 # Save Path
 gen_data_path = join(your_path, "Gens/gen_data_{this_version}")
@@ -210,7 +211,7 @@ def Train_Single(opt, dataloader, model_index, seed):
         loss_g_l.append(G_loss_epoch)
 
         if epoch % 100 == 0:
-            print("[Epoch %d] [D loss: %.4f] [G loss: %.4f]" % (epoch, D_loss_epoch, G_loss_epoch))
+            print("[Epoch %d] [D loss: %.10f] [G loss: %.10f]" % (epoch, D_loss_epoch, G_loss_epoch))
             print("--- %d seconds passed ---" % (time.time() - start_time))
 
         if 't' in opt.noise_name:
@@ -258,7 +259,8 @@ def Screen_Ensemble(thres_perc=50):
     for j in range(opt.numNN):
         # load loss, focus on the last generator loss
         loss_np = np.load(join(gen_data_path, 'loss_id%d.npy' % j))
-        loss_l.append(loss_np[:, 1].iloc[-1])
+        # loss_l.append(loss_np[:, 1].iloc[-1])
+        loss_l.append(loss_np[1, -1])
 
     threshold_loss = np.percentile(loss_l, thres_perc)
     select_l = []

@@ -15,8 +15,10 @@ from Dataset import Dataset_IS
 from Transform import *
 from gen_thresholds import gen_thresholds
 
+from NewStrategies import Momentum, Breakout, VolTarget
+
 sample_number = 1000
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 
 
 def Empirical_Stats(data):
@@ -47,35 +49,73 @@ def Compute_PNL_NP_IS(R):
     R_tensor = Tensor(R)
     # Price
     prices_l = Inc2Price(R_tensor)
-    port_prices_l = StaticPort(prices_l, 50, opt.static_way, insample=True)
+    port_prices_l = StaticPort(prices_l, opt.n_trans, opt.static_way, insample=True)
 
     PNL_BH = BuyHold(prices_l, opt.Cap)
     PNL_l = [PNL_BH]
     columns = ['Stk-%d ' % (i + 1) for i in range(PNL_BH.shape[1])]
 
-    thresholds_pct = [[31, 69]]
-
-    strategies = ['Port', 'MR', 'TF']
+    thresholds_pct = opt.thresholds_pct
+    strategies = opt.strategies
 
     for strategy in strategies:
         if strategy == 'Port':
             PNL_BHPort = BuyHold(port_prices_l, opt.Cap)
             PNL_l.append(PNL_BHPort)
             columns.extend(['Trans-%d ' % (i + 1) for i in range(PNL_BHPort.shape[1])])
+
         elif strategy == 'MR':
             for percentile_l in thresholds_pct:
-                thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, 100, opt.WH)
-                PNL_MR = MeanRev(prices_l, opt.Cap, opt.WH, LR=opt.ratios[0], SR=opt.ratios[1],
-                                 ST=thresholds_array[:, -1], LT=thresholds_array[:, -2])
+                thresholds_array = gen_thresholds(
+                    opt.data_name, opt.tickers, strategy, percentile_l, opt.len, opt.WH
+                )
+                PNL_MR = MeanRev(
+                    prices_l, opt.Cap, opt.WH,
+                    LR=opt.ratios[0], SR=opt.ratios[1],
+                    ST=thresholds_array[:, -1], LT=thresholds_array[:, -2]
+                )
                 PNL_l.append(PNL_MR)
                 columns.extend(['MR-%d ' % (i + 1) for i in range(PNL_MR.shape[1])])
+
         elif strategy == 'TF':
             for percentile_l in thresholds_pct:
-                thresholds_array = gen_thresholds(opt.data_name, opt.tickers, strategy, percentile_l, 100, opt.WH)
-                PNL_TF = TrendFollow(prices_l, opt.Cap, opt.WH, LR=opt.ratios[0], SR=opt.ratios[1],
-                                     ST=thresholds_array[:, 0], LT=thresholds_array[:, 1])
+                thresholds_array = gen_thresholds(
+                    opt.data_name, opt.tickers, strategy, percentile_l, opt.len, opt.WH
+                )
+                PNL_TF = TrendFollow(
+                    prices_l, opt.Cap, opt.WH,
+                    LR=opt.ratios[0], SR=opt.ratios[1],
+                    ST=thresholds_array[:, 0], LT=thresholds_array[:, 1]
+                )
                 PNL_l.append(PNL_TF)
                 columns.extend(['TF-%d ' % (i + 1) for i in range(PNL_TF.shape[1])])
+
+        elif strategy == 'MOM':
+            PNL_MOM = Momentum(
+                prices_l, opt.Cap, opt.WH,
+                LR=opt.ratios[0], SR=opt.ratios[1],
+                upper_pct=opt.thresholds_pct[0][1],
+                lower_pct=opt.thresholds_pct[0][0],
+            )
+            PNL_l.append(PNL_MOM)
+            columns.extend(['MOM-%d ' % (i + 1) for i in range(PNL_MOM.shape[1])])
+
+        elif strategy == 'BO':
+            PNL_BO = Breakout(
+                prices_l, opt.Cap, opt.WH,
+                LR=opt.ratios[0], SR=opt.ratios[1],
+            )
+            PNL_l.append(PNL_BO)
+            columns.extend(['BO-%d ' % (i + 1) for i in range(PNL_BO.shape[1])])
+
+        elif strategy == 'VT':
+            PNL_VT = VolTarget(
+                prices_l, opt.Cap, opt.WH,
+                target_vol=0.10,
+            )
+            PNL_l.append(PNL_VT)
+            columns.extend(['VT-%d ' % (i + 1) for i in range(PNL_VT.shape[1])])
+
         else:
             pass
 
@@ -105,7 +145,7 @@ def Load_FakeData(model_index):
             tmp_fake_l.append(tmp_fake0)
 
         tmp_fake = np.concatenate(tmp_fake_l)
-        sample_idx = random.sample(range(tmp_fake.shape[0]), sample_number)
+        sample_idx = random.sample(range(tmp_fake.shape[0]), min(sample_number, tmp_fake.shape[0]))
         tmp_fake = tmp_fake[sample_idx, :]
         fake_l.append(tmp_fake)
         epoches_l.append(i)
@@ -118,7 +158,8 @@ def VaR_ES_Real_Stats(opt):
     index_l = ['Real']
     real_stats_l = []
     OOS_alphas = [0.01, 0.05, 0.10]
-    sub_path = '_'.join(['Synthetic',
+    # sub_path = '_'.join(['Synthetic',
+    sub_path = '_'.join([opt.data_name,
                          '_'.join(opt.strategies),
                          'P' + str(opt.n_trans),
                          'Cap' + str(opt.Cap),
@@ -159,7 +200,8 @@ def VaR_ES_Real_Stats(opt):
 
 # compute the sampling error given the sample number
 def VaR_ES_Sampling_Error(opt):
-    dataset = Dataset_IS(tickers=opt.tickers, data_path=f"{your_path}/gan_data/{opt.data_name}", length=sample_number)
+    # dataset = Dataset_IS(tickers=opt.tickers, data_path=f"{your_path}/gan_data/{opt.data_name}", length=sample_number)
+    dataset = Dataset_IS(tickers=opt.tickers, data_path=f"{your_path}/gan_data/{opt.data_name}", length=opt.len)
     real = np.array([d.detach().numpy() for d in dataset.samples])
 
     real_stats_l, is_final_clms = VaR_ES_Real_Stats(opt)
@@ -168,7 +210,7 @@ def VaR_ES_Sampling_Error(opt):
     is_sample_ve_l = []
 
     for i in range(16):
-        sample_idx = random.sample(range(real.shape[0]), sample_number)
+        sample_idx = random.sample(range(len(real)), min(sample_number, len(real)))
         sample_fake = real[sample_idx, :, :]
         fake_PNL, is_clms_l = Compute_PNL_NP_IS(sample_fake)
         fake_ve = Empirical_Stats(fake_PNL).reshape(-1)
@@ -202,7 +244,8 @@ def VaR_ES_Fake_Error(opt, fake_l, epoches_l, model_index):
         is_sample_ve_l = []
         print('  ' * 6 + 'Epoch ' + str(i * 10) + '  ' * 6)
         for j in range(16):
-            sample_idx = random.sample(range(fake.shape[0]), sample_number)
+            # sample_idx = random.sample(range(fake.shape[0]), min(sample_number, fake.shape[0]))
+            sample_idx = np.random.choice(fake.shape[0], sample_number, replace=True)
             sample_fake = fake[sample_idx, :, :]
             fake_PNL, is_clms_l = Compute_PNL_NP_IS(sample_fake)
             fake_ve = Empirical_Stats(fake_PNL).reshape(-1)
@@ -213,7 +256,8 @@ def VaR_ES_Fake_Error(opt, fake_l, epoches_l, model_index):
         std_err_l.append(np.std(np.stack(is_sample_ve_l, axis=1), axis=1))
 
     mean_df = pd.DataFrame(np.round(np.column_stack(mean_err_l).T, 3), index=epoches_l, columns=is_final_clms)
-    std_df = pd.DataFrame(np.round(np.column_stack(std_err_l).T, 3), index=epoches_l, columns=is_final_clms)
+    # std_df = pd.DataFrame(np.round(np.column_stack(std_err_l).T, 3), index=epoches_l, columns=is_final_clms)
+    std_df = pd.DataFrame(np.column_stack(std_err_l).T, index=epoches_l, columns=is_final_clms)
     save_path = f"{your_path}/Results_S{sample_number}/{this_version}_Model_{model_index}/"
     os.makedirs(save_path, exist_ok=True)
     mean_df.to_csv(join(save_path, 'Mean_OOS_RE_Mean.csv'))
@@ -221,26 +265,39 @@ def VaR_ES_Fake_Error(opt, fake_l, epoches_l, model_index):
 
 
 # Summarize the results for all selected models
-def Eval_Sum(opt):
-    path = f'{your_path}/Results_S{sample_number}/{this_version}_Model_{model_index}'
-    folders = os.listdir(path)
-    folders = [i for i in folders if isdir(join(path, i))]
-    folders.sort()
-
+def Eval_Sum(opt, select_l):
     mean_l = []
     std_l = []
-    for k in folders:
-        mean_df = pd.read_csv(join(path, k, 'Mean_OOS_RE_Mean.csv'), index_col=0)
-        std_df = pd.read_csv(join(path, k, 'Std_OOS_RE.csv'), index_col=0)
-        arg_min_ind = mean_df.mean(1).argmin()
-        mean_res = mean_df.mean(1).min() * 100
+
+    for model_index in select_l:
+        path = f'{your_path}/Results_S{sample_number}/{this_version}_Model_{model_index}'
+
+        mean_path = join(path, 'Mean_OOS_RE_Mean.csv')
+        std_path = join(path, 'Std_OOS_RE.csv')
+
+        if not isfile(mean_path) or not isfile(std_path):
+            print(f'Fichiers manquants pour le modèle {model_index}')
+            continue
+
+        mean_df = pd.read_csv(mean_path, index_col=0)
+        std_df = pd.read_csv(std_path, index_col=0)
+
+        arg_min_ind = mean_df.mean(axis=1).argmin()
+        mean_res = mean_df.mean(axis=1).min() * 100
+        std_res = std_df.mean(axis=1).iloc[arg_min_ind] * 100
+
         mean_l.append(mean_res)
-        std_res = std_df.mean(1).iloc[arg_min_ind] * 100
+        
         std_l.append(std_res)
-    
+
+    if len(mean_l) == 0:
+        print("Aucun résultat trouvé.")
+        return
+
     mean_l = np.array(mean_l)
     std_l = np.array(std_l)
-    print('Overall [Mean: %.2f] [Std: %.2f]' % (np.mean(mean_l), np.mean(std_l)))
+
+    print('Overall [Mean: %.2f] [Std: %.10f]' % (np.mean(mean_l), np.mean(std_l)))
 
 
 if __name__ == "__main__":
@@ -251,8 +308,9 @@ if __name__ == "__main__":
     select_l = Screen_Ensemble(thres_perc=50)
     for model_index in select_l:
         print('Model Index:', model_index)
-        fake_l, epoches_l = Load_FakeData(opt)
-        VaR_ES_Fake_Error(opt, fake_l, epoches_l)
+        fake_l, epoches_l = Load_FakeData(model_index)
+        VaR_ES_Fake_Error(opt, fake_l, epoches_l, model_index)
 
     # compute the overall summary of the results
-    Eval_Sum(opt)
+    #Eval_Sum(opt)
+    Eval_Sum(opt, select_l)

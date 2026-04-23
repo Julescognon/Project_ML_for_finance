@@ -24,7 +24,7 @@ from Dataset import Dataset_IS
 from Transform import *
 from gen_thresholds import gen_thresholds
 
-your_path = 'your_path'  # Replace with your actual path
+your_path = '/Users/jcognon/Tail-GAN'  # Replace with your actual path
 sample_number = 1000
 
 

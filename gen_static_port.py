@@ -12,7 +12,7 @@ import scipy.sparse as sparse
 import scipy.stats as stats
 
 # Save Path
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 trans_parent_data_path = join(your_path, 'Static_Port_Transform')
 os.makedirs(trans_parent_data_path, exist_ok=True)
 
@@ -75,3 +75,4 @@ def Gen_StaticPort(static_way, n_stocks, n_ports):
 
 if __name__ == '__main__':
     Gen_StaticPort('LShort', n_stocks=5, n_ports=50)
+    # Gen_StaticPort('LShort', n_stocks=10, n_ports=50)

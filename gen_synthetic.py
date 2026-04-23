@@ -11,7 +11,7 @@ import statsmodels.api as sm
 from sklearn.datasets import make_sparse_spd_matrix, make_spd_matrix
 from statsmodels.stats.moment_helpers import cov2corr, corr2cov
 
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 parent_data_path = join(your_path, 'gan_data')
 
 
@@ -126,7 +126,7 @@ def gen_data(data_name, length, n_rows, n_cols):
 if __name__ == "__main__":
     # asset types: Gauss, AR(+0.5), AR(-0.12), GARCH, GARCH-T
     data_name = '1_Gauss+1_AR50+1_AR-12+1_GARCH-T5+1_GARCH-T10' 
-    length = 500000     # number of samples
+    length = 5000     # number of samples
     n_rows = 5          # number of assets
     n_cols = 100        # number of timestamps
     gen_data(data_name, length, n_rows, n_cols)

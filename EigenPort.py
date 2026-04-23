@@ -21,7 +21,7 @@ from Dataset import *
 from Transform_Eigen import *
 
 
-your_path = 'your_path'  # Replace with your actual path
+your_path = '/Users/jcognon/Tail-GAN'  # Replace with your actual path
 path = join(your_path, 'Stats/Stk20')
 os.makedirs(path, exist_ok=True)
 
@@ -56,6 +56,64 @@ def Mean_Corr(real):
     real_std = np.mean(np.array(real_std_l), axis=0)
     return real_corr, real_std
 
+#PCA avec rolling window
+# def Mean_Corr(real, window=50):
+#     real_corr_l = []
+#     real_std_l = []
+
+#     n_samples, n_assets, T = real.shape
+
+#     for i in range(n_samples):
+#         data = real[i]  # shape (n_assets, T)
+
+#         for t in range(window, T):
+#             window_data = data[:, t-window:t]
+
+#             # corrélation locale
+#             tmp_real_corr = np.corrcoef(window_data)
+#             real_corr_l.append(tmp_real_corr)
+
+#             # volatilité locale
+#             tmp_real_std = np.std(window_data, axis=1)
+#             real_std_l.append(tmp_real_std)
+
+#     real_corr = np.mean(np.array(real_corr_l), axis=0)
+#     real_std = np.mean(np.array(real_std_l), axis=0)
+
+#     return real_corr, real_std
+
+
+#PCA avec poids (importance des mouvements)
+# def Mean_Corr(real):
+#     n_samples, n_assets, T = real.shape
+
+#     cov_acc = np.zeros((n_assets, n_assets))
+#     std_acc = np.zeros(n_assets)
+
+#     for i in range(n_samples):
+#         data = real[i]  # shape (n_assets, T)
+
+#         # centrer
+#         data = data - np.mean(data, axis=1, keepdims=True)
+
+#         # poids (importance des mouvements)
+#         weights = np.linalg.norm(data, axis=0) ** 2
+#         weights = weights / np.sum(weights)
+
+#         # covariance pondérée (vectorisée)
+#         cov = data @ np.diag(weights) @ data.T
+
+#         cov_acc += cov
+#         std_acc += np.sqrt(np.diag(cov))
+
+#     real_cov = cov_acc / n_samples
+#     real_std = std_acc / n_samples
+
+#     # conversion en corrélation
+#     D = np.diag(1 / real_std)
+#     real_corr = D @ real_cov @ D
+
+#     return real_corr, real_std
 
 def Other_Real_Stats_P(opt, real):
     save_path = join(path, 'Corr.csv')

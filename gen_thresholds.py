@@ -13,7 +13,7 @@ from torch import nn
 
 from Transform import Tensor, Inc2Price, movingaverage
 
-your_path = 'your_path'
+your_path = '/Users/jcognon/Tail-GAN'
 parent_data_path = join(your_path, 'gan_data')
 
 
@@ -37,8 +37,18 @@ def gen_thresholds(data_name, tickers, strategy, percentile_l, length, WH):
     else:
         data_path = join(parent_data_path, data_name)
         data_l = []
-        files = os.listdir(data_path)
+        # files = os.listdir(data_path)
+        # files.sort()
+        # for item in range(length):
+        #     file_path = join(data_path, files[item])
+        #     tmp_data = pd.read_csv(file_path)[tickers].values.T
+        #     data_l.append(tmp_data)
+
+        files = [f for f in os.listdir(data_path) if f.endswith(".csv")]
         files.sort()
+
+        length = min(length, len(files))
+
         for item in range(length):
             file_path = join(data_path, files[item])
             tmp_data = pd.read_csv(file_path)[tickers].values.T
@@ -49,33 +59,68 @@ def gen_thresholds(data_name, tickers, strategy, percentile_l, length, WH):
 
         prices_l = Inc2Price(data)
 
-        prices_l_flat = prices_l.view(prices_l.shape[0] * prices_l.shape[1], -1)
+
+
+        prices_l = Inc2Price(data)
 
         thresholds_array_list = []
         for stk in range(data.shape[1]):
             if 'MR' in strategy:
-                prices_l_ma = torch.mean(prices_l[:, :, :WH + 1], dim=2)
-                prices_l_ma_flat = prices_l_ma.view(prices_l_ma.shape[0] * prices_l_ma.shape[1], -1)
+                prices_stk = prices_l[:, stk, :]  # (batch, T+1)
+                prices_ma_stk = torch.mean(prices_stk[:, :WH + 1], dim=1, keepdim=True)  # (batch, 1)
 
-                # Compute the z-scores for each day using the historical data up to that day
-                zscores_MR = (prices_l_flat - prices_l_ma_flat) / 0.01
-                zscores_MR = zscores_MR.cpu().detach().numpy()
+                zscores_MR = (prices_stk - prices_ma_stk) / 0.01
+                zscores_MR = zscores_MR.cpu().detach().numpy().reshape(-1)
+
                 thresholds_array = np.array([np.percentile(zscores_MR, i) for i in percentile_l])
                 thresholds_array_list.append(thresholds_array)
-            elif 'TF' in strategy:
-                prices_l_ma = movingaverage(prices_l, WH)
-                prices_l_ma2 = movingaverage(prices_l, WH * 2)
-                prices_l_ma_flat = prices_l_ma.reshape(prices_l_ma.shape[0] * prices_l_ma.shape[1], -1)
-                prices_l_ma2_flat = prices_l_ma2.reshape(prices_l_ma2.shape[0] * prices_l_ma2.shape[1], -1)
-                # Compute the z-scores for each day using the historical data up to that day
-                zscores_TF = (prices_l_ma_flat - prices_l_ma2_flat) / 0.01
 
-                zscores_TF = zscores_TF.cpu().detach().numpy()
+            elif 'TF' in strategy:
+                prices_ma_stk = movingaverage(prices_l[:, stk:stk+1, :], WH).squeeze(1)
+                prices_ma2_stk = movingaverage(prices_l[:, stk:stk+1, :], WH * 2).squeeze(1)
+
+                zscores_TF = (prices_ma_stk - prices_ma2_stk) / 0.01
+                zscores_TF = zscores_TF.cpu().detach().numpy().reshape(-1)
+
                 thresholds_array = np.array([np.percentile(zscores_TF, i) for i in percentile_l])
                 thresholds_array_list.append(thresholds_array)
+
             else:
                 pass
 
         thresholds_array_stocks = np.stack(thresholds_array_list)
         np.save(thresholds_path, thresholds_array_stocks)
     return thresholds_array_stocks
+
+if __name__ == "__main__":
+    data_name = "Crypto5_Binance_1m_2025Q4_step10"
+    tickers = ["BTC", "ETH", "BNB", "XRP", "SOL"]
+
+    for s in ["MR", "TF"]:
+        gen_thresholds(
+            data_name=data_name,
+            tickers=tickers,
+            strategy=s,
+            percentile_l=[31, 69],
+            length=3563,
+            WH=10
+        )
+
+# if __name__ == "__main__":
+#     import json
+
+#     with open("gan_data/Crypto10_Binance_1h_2024_2026_step6/metadata.json") as f:
+#         md = json.load(f)
+
+#     data_name = md["data_name"]
+#     tickers = md["repo_usage"]["tailgan_tickers"]
+
+#     for s in ["MR", "TF"]:
+#         gen_thresholds(
+#             data_name=data_name,
+#             tickers=tickers,
+#             strategy=s,
+#             percentile_l=[31, 69],
+#             length=100,
+#             WH=10
+#         )
