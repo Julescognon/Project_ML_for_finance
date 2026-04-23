@@ -49,7 +49,7 @@ TailGAN/
 ├── Plot_quantile_pnl_multiple.py   # compares quantile / PnL plots across models
 ├── Plot_Corr_Auto.py               # correlation / autocorrelation diagnostics
 └── README.md
-'''
+```
 ## Main Additions Compared to the Original Repository
 
 ### `build_tailgan_crypto_dataset.py`
@@ -148,3 +148,4 @@ If you use the original Tail-GAN methodology, please cite the original paper:
   year={2025},
   publisher={INFORMS}
 }
+```
